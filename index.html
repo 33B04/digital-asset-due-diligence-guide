@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SaaS 与网站资产收购技术尽职调查（Due Diligence）及托管交易安全指南</title>
+  <meta name="description" content="面向开发者与投资者的数字资产收购技术审计指南：涵盖代码仓库健康度、数据库架构、服务器日志真实流量校验及 Escrow 资金托管流程。">
+  <style>
+    :root {
+      --bg: #ffffff;
+      --text: #1f2328;
+      --muted: #656d76;
+      --border: #d0d7de;
+      --code-bg: #f6f8fa;
+      --accent: #0969da;
+      --callout-bg: #f0f6fc;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", Helvetica, Arial, sans-serif;
+      line-height: 1.75;
+      color: var(--text);
+      background-color: var(--bg);
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem;
+    }
+    header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    h1 {
+      font-size: 1.9rem;
+      line-height: 1.3;
+      margin-bottom: 0.5rem;
+    }
+    .meta {
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+    h2 {
+      font-size: 1.4rem;
+      margin-top: 2.5rem;
+      padding-bottom: 0.4rem;
+      border-bottom: 1px solid var(--border);
+    }
+    h3 {
+      font-size: 1.15rem;
+      margin-top: 1.6rem;
+    }
+    pre {
+      background-color: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem;
+      overflow-x: auto;
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+    code {
+      font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, monospace;
+      background-color: var(--code-bg);
+      padding: 0.15rem 0.35rem;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+    pre code {
+      background: none;
+      padding: 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.5rem 0;
+      font-size: 0.95rem;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 0.75rem;
+      text-align: left;
+    }
+    th {
+      background-color: var(--code-bg);
+    }
+    .callout {
+      background-color: var(--callout-bg);
+      border-left: 4px solid var(--accent);
+      padding: 1rem 1.25rem;
+      margin: 1.5rem 0;
+      border-radius: 0 6px 6px 0;
+    }
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    footer {
+      margin-top: 3.5rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>SaaS 与网站资产收购技术尽职调查（Due Diligence）及托管交易安全指南</h1>
+  <div class="meta">技术文档 · 架构审计、流量真实性验证与 Escrow 资产交割标准</div>
+</header>
+
+<main>
+  <p>在收购成熟的 SaaS 应用、内容网站或独立软件项目时，财务报表与分析截图往往无法反映底层系统的真实维护成本。未经技术尽职调查（Technical Due Diligence）的收购，极易因隐性技术债务、过期依赖、虚构流量或权限交割漏洞导致资产价值大幅缩水。</p>
+
+  <p>本文提供一套可落地的工程级审计框架，涵盖代码仓库检查、服务器日志流量核验、支付状态机一致性审计，以及基于资金托管（Escrow）的安全交割流程。</p>
+
+  <h2>一、 代码仓库与依赖健康度审计</h2>
+
+  <p>获取只读（Read-Only）仓库访问权限后，首要任务是评估项目的工程可维护性与安全债务，而非仅仅查看前端界面。</p>
+
+  <h3>1. 提交历史与单点故障检查</h3>
+  <p>通过 Git 日志分析代码演进节奏，识别是否存在“突击包装”或硬编码敏感凭证（如泄露的 API 密钥、数据库密码）：</p>
+
+<pre><code># 检查最近 6 个月的提交频率与贡献者分布
+git shortlog -sn --since="6 months ago"
+
+# 扫描历史提交中可能残留的敏感环境变量或密钥模式
+git log -p -S "sk_live_" --all
+git log -p -S "PRIVATE_KEY" --all</code></pre>
+
+  <h3>2. 运行时与依赖漏洞评估</h3>
+  <p>过时的核心框架（如已停止安全更新的 PHP 7.x、旧版 Next.js/Node.js 或无维护的 WordPress 插件）意味着收购后必须立即投入重构成本。</p>
+
+<pre><code># Node.js / Next.js 项目依赖安全与过期版本检查
+npm audit --production
+npm outdated
+
+# PHP / Laravel / WordPress Composer 依赖检查
+composer audit</code></pre>
+
+  <div class="callout">
+    <strong>工程红线提示：</strong> 若项目重度依赖已停止维护的第三方闭源插件，或核心业务逻辑直接写入数据库存储过程且无任何自动化测试与迁移脚本，应在估值中扣除相应的重构工时成本。
+  </div>
+
+  <h2>二、 流量真实性核验：超越第三方分析截图</h2>
+
+  <p>前端统计工具（如 Google Analytics）的数据容易受到脚本刷量或过滤规则干扰。最可靠的验证方式是直接交叉比对 CDN（如 Cloudflare）或源站 Nginx/Apache 的原始访问日志（Access Logs）。</p>
+
+  <h3>Nginx 原始日志自动化清洗示例</h3>
+  <p>通过分析最近 30 天的源站日志，剔除已知爬虫与数据中心 ASN 请求，还原真实用户访问占比：</p>
+
+<pre><code># 统计访问量最高的前 15 个 User-Agent，识别异常爬虫或自动化脚本
+awk -F'"' '{print $6}' /var/log/nginx/access.log | sort | uniq -c | sort -rn | head -n 15
+
+# 排查高频单一 IP 请求（潜在刷量或异常采集特征）
+awk '{print $1}' /var/log/nginx/access.log | sort | uniq -c | sort -rn | head -n 20</code></pre>
+
+  <p>健康的自然搜索流量通常呈现以下特征：长尾着陆页分布均匀、静态资源（JS/CSS/图片）加载比例与 HTML 页面请求匹配、HTTP 4xx/5xx 错误率低于 1%。</p>
+
+  <h2>三、 收入与支付系统状态机核验</h2>
+
+  <p>对于订阅制 SaaS 或电商平台，买方需要确认财务数据与支付网关（如 Stripe）的 Webhook 回调事件严格一致，且不存在大量未处理的争议退款（Chargebacks）。</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>审计维度</th>
+        <th>核验方法</th>
+        <th>潜在风险信号</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>MRR（月经常性收入）</strong></td>
+        <td>只读权限登录 Stripe Dashboard 查看净收入与订阅流失率（Churn）</td>
+        <td>仅提供导出 CSV 表格，拒绝屏幕共享或只读权限验证</td>
+      </tr>
+      <tr>
+        <td><strong>Webhook 幂等性</strong></td>
+        <td>检查 <code>/api/webhooks/stripe</code> 源码与网关失败重试日志</td>
+        <td>同步阻塞处理邮件或数据库写入，导致超时重复记账</td>
+      </tr>
+      <tr>
+        <td><strong>退款与拒付率</strong></td>
+        <td>核对过去 12 个月 Disputes 比例</td>
+        <td>拒付率超过 0.75%，面临支付通道随时冻结风险</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>四、 基于 Escrow 托管的安全资产交割流程</h2>
+
+  <p>数字资产交易的核心难点在于“先付款”与“先交割”的信任博弈。规范的跨境或独立数字资产交易（例如在 <a href="https://marketplace.lunil.com/zh" target="_blank" rel="noopener">Lunil 数字资产交易平台</a> 等支持第三方资金托管的市场上）通常遵循严格的分阶段交割协议：</p>
+
+  <ol>
+    <li><strong>签署资产转让协议（APA）：</strong> 明确定义交割清单（域名 EPP 转移码、Git 仓库所有权、数据库快照、云服务账号迁移及 15–30 天售后技术支持期）。</li>
+    <li><strong>买方资金入账托管（Escrow Funded）：</strong> 买方将收购款项汇入独立托管账户（如 Escrow.com），资金锁定但暂不释放给卖方。</li>
+    <li><strong>技术资产分批转移与环境部署：</strong>
+      <ul>
+        <li>解锁域名并完成注册商转移；</li>
+        <li>移交代码仓库、环境变量模板（<code>.env.example</code>）及生产环境数据库脱敏/完整导出；</li>
+        <li>买方在独立服务器或云账号下完成部署并替换支付收款密钥。</li>
+      </ul>
+    </li>
+    <li><strong>验收期测试（Inspection Period）：</strong> 买方在约定的 3 至 7 个工作日内运行端到端冒烟测试，确认核心功能、DNS 解析与数据完整性无误。</li>
+    <li><strong>确认放款：</strong> 买方在托管平台确认验收通过，托管机构正式向卖方释放资金，交易闭环完成。</li>
+  </ol>
+
+  <h2>五、 交割前技术检查清单（Checklist）</h2>
+
+  <ul>
+    <li>[ ] 确认域名无注册商锁定（ClientTransferProhibited 已解除）且距到期日大于 60 天。</li>
+    <li>[ ] 确认所有第三方 API（OpenAI、AWS、邮件服务、地图接口等）均可平滑切换至买方独立计费账号。</li>
+    <li>[ ] 确认数据库迁移脚本可无报错执行，无硬编码的旧域名绝对路径残留。</li>
+    <li>[ ] 确认卖方已签署竞业限制与源代码副本销毁声明。</li>
+  </ul>
+</main>
+
+<footer>
+  <p>本文档作为数字资产收购技术审计参考指南发布。如需了解更多关于国际网站、SaaS 与域名安全交易流程，可访问 <a href="https://marketplace.lunil.com/zh" target="_blank" rel="noopener">Lunil 国际数字资产交易市场（中文版）</a>。</p>
+</footer>
+
+</body>
+</html>
